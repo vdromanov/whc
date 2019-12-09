@@ -10,7 +10,15 @@ import (
 
 var AllowedEmptyRows = 3
 
-func GetSpreadSheet(credentialsFname, spreadsheetID string) spreadsheet.Spreadsheet {
+type SpreadSheet struct {
+	spreadsheet.Spreadsheet
+}
+
+type Sheet struct {
+	*spreadsheet.Sheet
+}
+
+func GetSpreadSheet(credentialsFname, spreadsheetID string) SpreadSheet {
 	data, err := ioutil.ReadFile(credentialsFname)
 	checkError(err)
 	conf, err := google.JWTConfigFromJSON(data, spreadsheet.Scope)
@@ -20,32 +28,32 @@ func GetSpreadSheet(credentialsFname, spreadsheetID string) spreadsheet.Spreadsh
 	service := spreadsheet.NewServiceWithClient(client)
 	sheet, err := service.FetchSpreadsheet(spreadsheetID)
 	checkError(err)
-	return sheet
+	return SpreadSheet{sheet}
 }
 
-func GetSheetByTitle(spreadSheet *spreadsheet.Spreadsheet, title string) *spreadsheet.Sheet {
-	sheet, err := spreadSheet.SheetByTitle(title)
+func (sp SpreadSheet) GetSheetByTitle(title string) *Sheet {
+	sh, err := sp.SheetByTitle(title) //A pointer to spreadsheet's sheet
 	checkError(err)
-	return sheet
+	return &Sheet{sh}
 }
 
-func InsertCell(sheet *spreadsheet.Sheet, row, col int, value string) {
+func (sh Sheet) InsertCell(row, col int, value string) {
 	// Update cell content
-	sheet.Update(row, col, value)
+	sh.Update(row, col, value)
 	// Make sure call Synchronize to reflect the changes
-	err := sheet.Synchronize()
+	err := sh.Synchronize()
 	checkError(err)
 }
 
-func InsertRow(sheet *spreadsheet.Sheet, startRow, startCol int, values []string) {
+func (sh Sheet) InsertRow(startRow, startCol int, values []string) {
 	for pos, val := range values {
-		InsertCell(sheet, startRow, startCol+pos, val)
+		sh.InsertCell(startRow, startCol+pos, val)
 	}
 }
 
-func getFirstEmptyRow(sheet *spreadsheet.Sheet, allowedEmptyRows int) int {
+func (sh Sheet) getFirstEmptyRow(allowedEmptyRows int) int {
 	empties := 0
-	for rowCount, row := range sheet.Rows {
+	for rowCount, row := range sh.Rows {
 		isEmpty := true
 		for _, cell := range row {
 			if cell.Value != "" {
@@ -64,13 +72,13 @@ func getFirstEmptyRow(sheet *spreadsheet.Sheet, allowedEmptyRows int) int {
 	return 0
 }
 
-func AppendRow(sheet *spreadsheet.Sheet, rowBeginning int, values []string) {
-	rowPos := getFirstEmptyRow(sheet, AllowedEmptyRows)
-	InsertRow(sheet, rowPos, rowBeginning, values)
+func (sh Sheet) AppendRow(rowBeginning int, values []string) {
+	rowPos := sh.getFirstEmptyRow(AllowedEmptyRows)
+	sh.InsertRow(rowPos, rowBeginning, values)
 }
 
-func findRowByCellVal(sheet *spreadsheet.Sheet, value string) (rowPos, rowBeginning int) {
-	for rowCount, row := range sheet.Rows {
+func (sh Sheet) findRowByCellVal(value string) (rowPos, rowBeginning int) {
+	for rowCount, row := range sh.Rows {
 		rowBeginning := 0
 		isEmpty := true
 		for _, cell := range row {
@@ -87,12 +95,12 @@ func findRowByCellVal(sheet *spreadsheet.Sheet, value string) (rowPos, rowBeginn
 	return 0, 0
 }
 
-func UpdateRowByCellVal(sheet *spreadsheet.Sheet, cellValue string, values []string) {
-	rowPos, rowBeginning := findRowByCellVal(sheet, cellValue)
+func (sh Sheet) UpdateRowByCellVal(cellValue string, values []string) {
+	rowPos, rowBeginning := sh.findRowByCellVal(cellValue)
 	if rowPos != 0 {
-		InsertRow(sheet, rowPos, rowBeginning, values)
+		sh.InsertRow(rowPos, rowBeginning, values)
 	} else {
-		AppendRow(sheet, rowBeginning, values)
+		sh.AppendRow(rowBeginning, values)
 	}
 }
 
