@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/vdromanov/whc/database"
 	"github.com/vdromanov/whc/gsheets"
 	"github.com/vdromanov/whc/unitime"
 )
@@ -12,9 +13,9 @@ func main() {
 	CredentialsFname := "client_secret.json"
 	SpreadSheetID := "1CTDX18uqWvFLOsSjzoq5-CJcPl7QkBNaVOt_V_MBG3s"
 	sheet := gsheets.GetSpreadSheet(CredentialsFname, SpreadSheetID).GetSheetByTitle("Sheet1") //User id will be here
-	sheet.InsertCell(1, 3, "Hello")
-	sheet.InsertRow(2, 1, []string{"First", "Second", "Third"})
-	sheet.AppendRow(1, []string{"Append", "To", "This", "Row"})
+	// sheet.InsertCell(1, 3, "Hello")
+	// sheet.InsertRow(2, 1, []string{"First", "Second", "Third"})
+	// sheet.AppendRow(1, []string{"Append", "To", "This", "Row"})
 	sheet.UpdateRowByCellVal("To", []string{"Remove", "From", "This", "Row"})
 
 	//Playing with time and unixtime conversions
@@ -28,4 +29,14 @@ func main() {
 	fmt.Printf("From %s to %d\n", TimeExample, toUnixExample)
 	fmt.Printf("Now unixtime: %d\nTomorrow: %d\n", todayUnix, tomorrowUnix)
 	fmt.Printf("Hours diff: %.2f\n", unitime.DeltaHours(todayUnix, tomorrowUnix))
+
+	//Database
+	db := database.DbRepr{
+		DbConnStr:      "attend.db",
+		TableName:      "log_record",
+		IoTimeColumn:   "io_time",
+		PersonIDColumn: "user_id",
+	}
+	times := db.GetUserIoTimesBetween(todayUnix, tomorrowUnix, 18)
+	fmt.Println(times)
 }
