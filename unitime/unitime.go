@@ -28,12 +28,19 @@ func DeltaHours(before, after int64) float64 {
 	return diff.Hours()
 }
 
+func getMidnight(t time.Time) time.Time {
+	year, month, day := t.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
+}
+
 func UnixTimeToday() int64 {
-	rez := unixtime.Milli(time.Now())
+	midnight := getMidnight(time.Now())
+	rez := unixtime.Milli(midnight)
 	return int64(float64(rez) / 1000.0)
 }
 
 func UnixTimeTomorrow() int64 {
 	t := time.Now().Add(time.Hour * 24)
-	return int64(float64(unixtime.Milli(t)) / 1000.0)
+	midnight := getMidnight(t)
+	return int64(float64(unixtime.Milli(midnight)) / 1000.0)
 }
