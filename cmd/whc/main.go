@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/vdromanov/whc/database"
 	"github.com/vdromanov/whc/gsheets"
@@ -18,6 +21,13 @@ const (
 	dbFileEnv           = "DATABASE"
 )
 
+//Formats for time convertions
+const (
+	dateFmt     = "2 January"
+	timeFmt     = "15:04"
+	datetimeFmt = "2006-01-02 15:04"
+)
+
 var (
 	userID           string
 	credentialsFname string
@@ -26,18 +36,27 @@ var (
 	envVars          = []string{credentialsFnameEnv, spreadSheetIDEnv, dbFileEnv}
 )
 
-func getMissingEnvVar(namesSlice []string) string {
+func checkMissingEnvVar(namesSlice []string) error {
 	for _, val := range namesSlice {
 		if len(os.Getenv(val)) == 0 {
-			return val
+			return errors.New(fmt.Sprintf("env var %s is missing", val))
 		}
 	}
-	return ""
+	return nil
 }
 
-func getMinMax(s []int64) (int64, int64) {
+func getSortedUtimes(s []int64) ([]int64, error) {
+	p := make([]int64, 0)
+	if len(s) == 0 {
+		return append(p, 0, 0), errors.New("Nothing to sort")
+	}
+	fmt.Println(s)
 	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
-	return s[0], s[len(s)-1]
+	p = append(p, s[0])
+	if s[0] < s[len(s)-1] {
+		p = append(p, s[len(s)-1])
+	}
+	return p, nil
 }
 
 func main() {
@@ -49,38 +68,46 @@ func main() {
 		DbConnStr:      "attend.db",
 	}
 
+	//Parsing args & checking required env vars
 	flag.StringVar(&userID, "user", "1", "Specify user ID")
 	flag.Parse()
-
-	missingEnvVar := getMissingEnvVar(envVars)
-	if len(missingEnvVar) != 0 {
-		fmt.Printf("env var %s was not set\n", missingEnvVar)
-		os.Exit(2)
+	if err := checkMissingEnvVar(envVars); err != nil {
+		fmt.Println(err.Error())
+		fmt.Printf("Env vars:\n\t%s\nMust be specified\n", strings.Join(envVars, "\n\t"))
+		os.Exit(1)
 	}
+
 	db.DbConnStr = os.Getenv(dbFileEnv)
 	credentialsFname := os.Getenv(credentialsFnameEnv)
-	spreadSheetID := os.Getenv(spreadSheetIDEnv)
-	// spreadSheetID := "1CTDX18uqWvFLOsSjzoq5-CJcPl7QkBNaVOt_V_MBG3s"
+	spreadSheetID := os.Getenv(spreadSheetIDEnv) //Spreadsheet must be shared with service account (<credentialsFname>)
 
-	//Playing with Google Spreadsheets
 	sheet := gsheets.GetSpreadSheet(credentialsFname, spreadSheetID).GetSheetByTitle(userID)
-	sheet.AppendRow(0, []string{"Append", "To", "This", "Row"})
-	sheet.UpdateRowByCellVal("Append", []string{"Empty", "", "", "Space", "Between"})
 
-	//Playing with time and unixtime conversions
-	var UnixTimeExample int64 = 1575990685
-	TimeExample := "2019-12-10 10:10:11"
-	DefaultFmt := "2006-01-02 15:04:05"
 	todayUnix := unitime.UnixTimeToday()
 	tomorrowUnix := unitime.UnixTimeTomorrow()
-	toUnixExample, _ := unitime.ToUnixTime(DefaultFmt, TimeExample)
-	fmt.Printf("From %d to %s\n", UnixTimeExample, unitime.FromUnixTime(DefaultFmt, UnixTimeExample))
-	fmt.Printf("From %d to %s\n", UnixTimeExample, unitime.FromUnixTime("15:04", UnixTimeExample))
-	fmt.Printf("From %s to %d\n", TimeExample, toUnixExample)
-	fmt.Printf("Now unixtime: %d\nTomorrow: %d\n", todayUnix, tomorrowUnix)
-	fmt.Printf("Hours diff: %.2f\n", unitime.DeltaHours(todayUnix, tomorrowUnix))
+	id, err := strconv.Atoi(userID)
+	if err != nil {
+		fmt.Println("User ID should be int")
+		os.Exit(1)
+	}
+	times := db.GetUserIoTimesBetween(todayUnix, tomorrowUnix, id)
+	sortedTimes, err := getSortedUtimes(times)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 
-	//Database
-	times := db.GetUserIoTimesBetween(todayUnix, tomorrowUnix, 18)
-	fmt.Println(times)
+	//Building a row in gsheet
+	today := unitime.FromUnixTime(dateFmt, todayUnix)
+	workStartTime := unitime.FromUnixTime(timeFmt, sortedTimes[0])
+	workEndTime := ""
+	workedHours := ""
+	if len(sortedTimes) > 1 {
+		workEndTime = unitime.FromUnixTime(timeFmt, sortedTimes[len(sortedTimes)-1])
+		workedHours = fmt.Sprintf("%.2f", unitime.DeltaHours(sortedTimes[0], sortedTimes[len(sortedTimes)-1]))
+	}
+	rowToGoogle := []string{today, workStartTime, "", workEndTime, workedHours}
+	fmt.Println(rowToGoogle)
+	sheet.UpdateRowByCellVal(today, rowToGoogle)
+
 }
