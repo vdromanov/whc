@@ -37,24 +37,22 @@ func (sp SpreadSheet) GetSheetByTitle(title string) *Sheet {
 	return &Sheet{sh}
 }
 
-func (sh Sheet) InsertCell(row, col int, value string) {
-	// Update cell content
-	sh.Update(row, col, value)
-	// Make sure call Synchronize to reflect the changes
+func (sh Sheet) insertRow(startRow, startCol int, values []string) {
+	for pos, val := range values {
+		actualCol := startCol + pos
+		if len(val) != 0 {
+			sh.Update(startRow, actualCol, val)
+		}
+	}
 	err := sh.Synchronize()
 	checkError(err)
-}
-
-func (sh Sheet) InsertRow(startRow, startCol int, values []string) {
-	for pos, val := range values {
-		sh.InsertCell(startRow, startCol+pos, val)
-	}
 }
 
 func (sh Sheet) getFirstEmptyRow(allowedEmptyRows int) int {
 	empties := 0
 	for rowCount, row := range sh.Rows {
-		isEmpty := true
+		// isEmpty := true
+		isEmpty := false
 		for _, cell := range row {
 			if cell.Value != "" {
 				isEmpty = false
@@ -64,17 +62,18 @@ func (sh Sheet) getFirstEmptyRow(allowedEmptyRows int) int {
 		}
 		if isEmpty {
 			empties++
-			if empties > allowedEmptyRows {
+			if empties >= allowedEmptyRows {
 				return rowCount - allowedEmptyRows
 			}
 		}
 	}
-	return 0
+	return len(sh.Rows)
 }
 
 func (sh Sheet) AppendRow(rowBeginning int, values []string) {
-	rowPos := sh.getFirstEmptyRow(AllowedEmptyRows)
-	sh.InsertRow(rowPos, rowBeginning, values)
+	// rowPos := sh.getFirstEmptyRow(AllowedEmptyRows)
+	rowPos := len(sh.Rows)
+	sh.insertRow(rowPos, rowBeginning, values)
 }
 
 func (sh Sheet) findRowByCellVal(value string) (rowPos, rowBeginning int) {
@@ -98,7 +97,13 @@ func (sh Sheet) findRowByCellVal(value string) (rowPos, rowBeginning int) {
 func (sh Sheet) UpdateRowByCellVal(cellValue string, values []string) {
 	rowPos, rowBeginning := sh.findRowByCellVal(cellValue)
 	if rowPos != 0 {
-		sh.InsertRow(rowPos, rowBeginning, values)
+		for count, value := range values {
+			if len(value) != 0 {
+				sh.Update(rowPos, rowBeginning+count, value)
+			}
+		}
+		err := sh.Synchronize()
+		checkError(err)
 	} else {
 		sh.AppendRow(rowBeginning, values)
 	}
