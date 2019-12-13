@@ -50,7 +50,6 @@ func getSortedUtimes(s []int64) ([]int64, error) {
 	if len(s) == 0 {
 		return append(p, 0, 0), errors.New("Nothing to sort")
 	}
-	fmt.Println(s)
 	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
 	p = append(p, s[0])
 	if s[0] < s[len(s)-1] {

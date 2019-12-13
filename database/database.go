@@ -35,9 +35,7 @@ func (sq *DbRepr) GetUserIoTimesBetween(startUtime, endUtime int64, userId int) 
 		if err := rows.Scan(&utime); err != nil {
 			panic(err.Error)
 		}
-		fmt.Println(utime)
 		times = append(times, utime)
-		fmt.Println(times)
 	}
 	return times
 }

@@ -6,6 +6,26 @@ import (
 	"github.com/ulikunitz/unixtime"
 )
 
+var (
+	TZLocationStr        = "Local"
+	FallbackSecondsShift = 3 * 60 * 60
+	tzLocation           *time.Location
+)
+
+func init() {
+	local, err := time.LoadLocation(TZLocationStr)
+	if err != nil {
+		panic(err)
+	}
+	testTime := time.Now()
+	testFmt := "2006-01-02 15:04"
+	if testTime.In(local).Format(testFmt) == testTime.In(time.UTC).Format(testFmt) {
+		tzLocation = time.FixedZone("Fallback", FallbackSecondsShift) //Not all archs have "Europe/Moscow" time constant
+	} else {
+		tzLocation = local
+	}
+}
+
 func ToUnixTime(layout, timestr string) (int64, error) {
 	t, err := time.Parse(layout, timestr)
 	rez := unixtime.Milli(t)
@@ -14,7 +34,8 @@ func ToUnixTime(layout, timestr string) (int64, error) {
 
 func timeFromUnix(utime int64) time.Time {
 	t := utime * 1000
-	return unixtime.FromMilli(t)
+	tim := unixtime.FromMilli(t)
+	return tim.In(tzLocation)
 }
 
 func FromUnixTime(layout string, utime int64) string {
@@ -29,7 +50,8 @@ func DeltaHours(before, after int64) float64 {
 }
 
 func getMidnight(t time.Time) time.Time {
-	year, month, day := t.Date()
+	tim := t.In(tzLocation)
+	year, month, day := tim.Date()
 	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
 }
 
