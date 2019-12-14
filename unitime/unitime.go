@@ -37,21 +37,24 @@ func FormatToUnixTime(layout, timestr string) (int64, error) {
 
 }
 
-func timeFromUnix(utime int64) time.Time {
+func TimeFromUnix(utime int64) time.Time {
 	t := utime * 1000
 	tim := unixtime.FromMilli(t)
 	return tim.In(tzLocation)
 }
 
 func FormatFromUnixTime(layout string, utime int64) string {
-	t := timeFromUnix(utime)
+	t := TimeFromUnix(utime)
 	return t.Format(layout)
+}
+func DeltaHours(start, stop time.Time) float64 {
+	diff := stop.Sub(start)
+	return diff.Hours()
 }
 
 func DeltaHoursUnixTime(before, after int64) float64 {
-	start, stop := timeFromUnix(before), timeFromUnix(after)
-	diff := stop.Sub(start)
-	return diff.Hours()
+	start, stop := TimeFromUnix(before), TimeFromUnix(after)
+	return DeltaHours(start, stop)
 }
 
 func GetBeginningOfDay(fmtStr, valuesStr string) (time.Time, error) {
@@ -61,6 +64,10 @@ func GetBeginningOfDay(fmtStr, valuesStr string) (time.Time, error) {
 	return time.Date(year, month, day, 0, 0, 0, 0, tzLocation), err
 }
 
-func NextDay(t time.Time) time.Time {
-	return t.In(tzLocation).Add(time.Hour * 24)
+func TimeWDelay(t time.Time, delay string) time.Time {
+	delayDuration, err := time.ParseDuration(delay)
+	if err != nil {
+		panic(err.Error())
+	}
+	return t.Add(delayDuration)
 }

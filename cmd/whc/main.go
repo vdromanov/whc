@@ -33,6 +33,7 @@ const (
 var (
 	userID           string
 	checkingDate     string
+	breakDuration    string
 	credentialsFname string
 	spreadSheetID    string
 	dbFname          string
@@ -74,6 +75,7 @@ func main() {
 	//Parsing args & checking required env vars
 	flag.StringVar(&userID, "user", "1", "Specify user ID")
 	flag.StringVar(&checkingDate, "date", today, "Specify date of sync")
+	flag.StringVar(&breakDuration, "break", "15m", "Dinner duration. Ex: 10m, 1.5h, ...")
 	flag.Parse()
 	if err := checkMissingEnvVar(envVars); err != nil {
 		fmt.Println(err.Error())
@@ -81,14 +83,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	//Range of working time calculations
-	//From 00:00 to 24:00 of date
+	//Range of working time calculations (24h wide)
 	startCheckPeriod, err := unitime.GetBeginningOfDay(shortDateFmt, checkingDate)
 	if err != nil {
 		fmt.Println("Unable to parse time:", err.Error())
 		os.Exit(1)
 	}
-	endCheckPeriod := unitime.NextDay(startCheckPeriod)
+	endCheckPeriod := unitime.TimeWDelay(startCheckPeriod, "24h")
 	startCheckUtime := unitime.ToUnixTime(startCheckPeriod)
 	endCheckUtime := unitime.ToUnixTime(endCheckPeriod)
 
@@ -108,20 +109,21 @@ func main() {
 
 	//Calculating times
 	day := unitime.FormatFromUnixTime(dateFmt, startCheckUtime)
-	workStartTime := unitime.FormatFromUnixTime(timeFmt, sortedTimes[0])
+	workStart := unitime.TimeFromUnix(sortedTimes[0])
+	workStartTime := workStart.Format(timeFmt)
 	workEndTime := ""
 	workedHours := ""
 	if len(sortedTimes) > 1 {
-		workEndTime = unitime.FormatFromUnixTime(timeFmt, sortedTimes[len(sortedTimes)-1])
-		workedHours = fmt.Sprintf("%.2f", unitime.DeltaHoursUnixTime(sortedTimes[0], sortedTimes[len(sortedTimes)-1]))
+		workEnd := unitime.TimeFromUnix(sortedTimes[len(sortedTimes)-1])
+		workEndTime = workEnd.Format(timeFmt)
+		workedHours = fmt.Sprintf("%.2f", unitime.DeltaHours(unitime.TimeWDelay(workStart, breakDuration), workEnd))
 	}
 
 	//Sending to google
 	credentialsFname := os.Getenv(credentialsFnameEnv)
 	spreadSheetID := os.Getenv(spreadSheetIDEnv) //Spreadsheet must be shared with service account (<credentialsFname>)
 	sheet := gsheets.GetSpreadSheet(credentialsFname, spreadSheetID).GetSheetByTitle(userID)
-	rowToGoogle := []string{day, workStartTime, "", workEndTime, workedHours}
+	rowToGoogle := []string{day, workStartTime, breakDuration, workEndTime, workedHours}
 	fmt.Printf("Sending to google: %v\n", rowToGoogle)
 	sheet.UpdateRowByCellVal(day, rowToGoogle)
-
 }
