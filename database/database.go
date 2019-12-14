@@ -17,14 +17,14 @@ type DbRepr struct {
 func (sq *DbRepr) GetUserIoTimesBetween(startUtime, endUtime int64, userId int) []int64 {
 	db, err := sql.Open("sqlite3", sq.DbConnStr)
 	if err != nil {
-		panic(err.Error)
+		panic(err.Error())
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ? AND %s >= ? AND %s <= ?", sq.IoTimeColumn, sq.TableName, sq.PersonIDColumn, sq.IoTimeColumn, sq.IoTimeColumn)
-	fmt.Println(query)
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ? AND %s > ? AND %s < ?", sq.IoTimeColumn, sq.TableName, sq.PersonIDColumn, sq.IoTimeColumn, sq.IoTimeColumn)
+	fmt.Printf("SQL:\n\t%s\n", query)
 	rows, err := db.Query(query, userId, startUtime, endUtime)
 	if err != nil {
-		panic(err.Error)
+		panic(err.Error())
 	}
 	defer rows.Close()
 
@@ -33,7 +33,7 @@ func (sq *DbRepr) GetUserIoTimesBetween(startUtime, endUtime int64, userId int) 
 	for rows.Next() {
 		var utime int64
 		if err := rows.Scan(&utime); err != nil {
-			panic(err.Error)
+			panic(err.Error())
 		}
 		times = append(times, utime)
 	}
