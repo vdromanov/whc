@@ -2,6 +2,7 @@ package gsheets
 
 import (
 	"io/ioutil"
+	"log"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -71,7 +72,6 @@ func (sh Sheet) getFirstEmptyRow(allowedEmptyRows int) int {
 }
 
 func (sh Sheet) AppendRow(rowBeginning int, values []string) {
-	// rowPos := sh.getFirstEmptyRow(AllowedEmptyRows)
 	rowPos := len(sh.Rows)
 	sh.insertRow(rowPos, rowBeginning, values)
 }
@@ -111,6 +111,6 @@ func (sh Sheet) UpdateRowByCellVal(cellValue string, values []string) {
 
 func checkError(err error) {
 	if err != nil {
-		panic(err.Error())
+		log.Fatalln(err.Error())
 	}
 }

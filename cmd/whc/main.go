@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -78,18 +79,18 @@ func main() {
 	flag.StringVar(&breakDuration, "break", "15m", "Dinner duration. Ex: 10m, 1.5h, ...")
 	flag.Parse()
 	if err := checkMissingEnvVar(envVars); err != nil {
-		fmt.Println(err.Error())
-		fmt.Printf("Env vars:\n\t%s\nMust be specified\n", strings.Join(envVars, "\n\t"))
-		os.Exit(1)
+		log.Fatalf("%s\nEnv vars:\n\t%s\nMust be specified\n", err.Error(), strings.Join(envVars, "\n\t"))
 	}
 
 	//Range of working time calculations (24h wide)
 	startCheckPeriod, err := unitime.GetBeginningOfDay(shortDateFmt, checkingDate)
 	if err != nil {
-		fmt.Println("Unable to parse time:", err.Error())
-		os.Exit(1)
+		log.Fatalln("Unable to parse time:", err.Error())
 	}
-	endCheckPeriod := unitime.TimeWDelay(startCheckPeriod, "24h")
+	endCheckPeriod, err := unitime.TimeWDelay(startCheckPeriod, "24h")
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
 	startCheckUtime := unitime.ToUnixTime(startCheckPeriod)
 	endCheckUtime := unitime.ToUnixTime(endCheckPeriod)
 
@@ -97,14 +98,15 @@ func main() {
 	db.DbConnStr = os.Getenv(dbFileEnv)
 	id, err := strconv.Atoi(userID)
 	if err != nil {
-		fmt.Println("User ID should be int")
-		os.Exit(1)
+		log.Fatalln(err.Error())
 	}
-	times := db.GetUserIoTimesBetween(startCheckUtime, endCheckUtime, id)
+	times, err := db.GetUserIoTimesBetween(startCheckUtime, endCheckUtime, id)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
 	sortedTimes, err := getSortedUtimes(times)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatalln(err.Error())
 	}
 
 	//Calculating times
@@ -112,18 +114,19 @@ func main() {
 	workStart := unitime.TimeFromUnix(sortedTimes[0])
 	workStartTime := workStart.Format(timeFmt)
 	workEndTime := ""
-	workedHours := ""
+	// workedHours := ""
 	if len(sortedTimes) > 1 {
 		workEnd := unitime.TimeFromUnix(sortedTimes[len(sortedTimes)-1])
 		workEndTime = workEnd.Format(timeFmt)
-		workedHours = fmt.Sprintf("%.2f", unitime.DeltaHours(unitime.TimeWDelay(workStart, breakDuration), workEnd))
+		// workedHours = fmt.Sprintf("%.2f", unitime.DeltaHours(unitime.TimeWDelay(workStart, breakDuration), workEnd))
 	}
 
 	//Sending to google
 	credentialsFname := os.Getenv(credentialsFnameEnv)
 	spreadSheetID := os.Getenv(spreadSheetIDEnv) //Spreadsheet must be shared with service account (<credentialsFname>)
 	sheet := gsheets.GetSpreadSheet(credentialsFname, spreadSheetID).GetSheetByTitle(userID)
-	rowToGoogle := []string{day, workStartTime, breakDuration, workEndTime, workedHours}
+	// rowToGoogle := []string{day, workStartTime, breakDuration, workEndTime, workedHours}
+	rowToGoogle := []string{day, workStartTime, breakDuration, workEndTime}
 	fmt.Printf("Sending to google: %v\n", rowToGoogle)
 	sheet.UpdateRowByCellVal(day, rowToGoogle)
 }

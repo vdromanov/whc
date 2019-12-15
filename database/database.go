@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/mxk/go-sqlite/sqlite3"
+	_ "github.com/mxk/go-sqlite/sqlite3" //We need <init> func of sql driver
 )
 
 type DbRepr struct {
@@ -14,28 +14,29 @@ type DbRepr struct {
 	IoTimeColumn   string
 }
 
-func (sq *DbRepr) GetUserIoTimesBetween(startUtime, endUtime int64, userId int) []int64 {
+//GetUserIoTimesBetween searches <userId>'s activity between <startUtime> and <endUtime>"
+func (sq *DbRepr) GetUserIoTimesBetween(startUtime, endUtime int64, userID int) ([]int64, error) {
+	times := make([]int64, 0)
+
 	db, err := sql.Open("sqlite3", sq.DbConnStr)
 	if err != nil {
-		panic(err.Error())
+		return times, err
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ? AND %s > ? AND %s < ?", sq.IoTimeColumn, sq.TableName, sq.PersonIDColumn, sq.IoTimeColumn, sq.IoTimeColumn)
 	fmt.Printf("SQL:\n\t%s\n", query)
-	rows, err := db.Query(query, userId, startUtime, endUtime)
+	rows, err := db.Query(query, userID, startUtime, endUtime)
 	if err != nil {
-		panic(err.Error())
+		return times, err
 	}
 	defer rows.Close()
-
-	times := make([]int64, 0)
 
 	for rows.Next() {
 		var utime int64
 		if err := rows.Scan(&utime); err != nil {
-			panic(err.Error())
+			return times, err
 		}
 		times = append(times, utime)
 	}
-	return times
+	return times, nil
 }
