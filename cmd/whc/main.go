@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -44,7 +43,7 @@ var (
 func checkMissingEnvVar(namesSlice []string) error {
 	for _, val := range namesSlice {
 		if len(os.Getenv(val)) == 0 {
-			return errors.New(fmt.Sprintf("env var %s is missing", val))
+			return fmt.Errorf("env var %s is missing", val)
 		}
 	}
 	return nil
@@ -52,7 +51,7 @@ func checkMissingEnvVar(namesSlice []string) error {
 
 func getSortedUtimes(s []int64) ([]int64, error) {
 	if len(s) == 0 {
-		return s, errors.New("No data")
+		return s, fmt.Errorf("No data: %v", s)
 	}
 	p := make([]int64, 0)
 	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
@@ -111,22 +110,22 @@ func main() {
 
 	//Calculating times
 	day := unitime.FormatFromUnixTime(dateFmt, startCheckUtime)
-	workStart := unitime.TimeFromUnix(sortedTimes[0])
-	workStartTime := workStart.Format(timeFmt)
-	workEndTime := ""
-	// workedHours := ""
+	workStartTime := unitime.TimeFromUnix(sortedTimes[0]).Format(timeFmt)
+	workEndTime := "-"
+	breakDurationMins, err := unitime.TimeWDelay(startCheckPeriod, breakDuration)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	breakDurationTime := breakDurationMins.Format(timeFmt)
 	if len(sortedTimes) > 1 {
-		workEnd := unitime.TimeFromUnix(sortedTimes[len(sortedTimes)-1])
-		workEndTime = workEnd.Format(timeFmt)
-		// workedHours = fmt.Sprintf("%.2f", unitime.DeltaHours(unitime.TimeWDelay(workStart, breakDuration), workEnd))
+		workEndTime = unitime.TimeFromUnix(sortedTimes[len(sortedTimes)-1]).Format(timeFmt)
 	}
 
 	//Sending to google
 	credentialsFname := os.Getenv(credentialsFnameEnv)
 	spreadSheetID := os.Getenv(spreadSheetIDEnv) //Spreadsheet must be shared with service account (<credentialsFname>)
 	sheet := gsheets.GetSpreadSheet(credentialsFname, spreadSheetID).GetSheetByTitle(userID)
-	// rowToGoogle := []string{day, workStartTime, breakDuration, workEndTime, workedHours}
-	rowToGoogle := []string{day, workStartTime, breakDuration, workEndTime}
-	fmt.Printf("Sending to google: %v\n", rowToGoogle)
+	rowToGoogle := []string{day, workStartTime, breakDurationTime, workEndTime}
 	sheet.UpdateRowByCellVal(day, rowToGoogle)
+	fmt.Printf("Sent to google: %v\n", rowToGoogle)
 }

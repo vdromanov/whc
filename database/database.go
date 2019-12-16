@@ -24,7 +24,6 @@ func (sq *DbRepr) GetUserIoTimesBetween(startUtime, endUtime int64, userID int) 
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ? AND %s > ? AND %s < ?", sq.IoTimeColumn, sq.TableName, sq.PersonIDColumn, sq.IoTimeColumn, sq.IoTimeColumn)
-	fmt.Printf("SQL:\n\t%s\n", query)
 	rows, err := db.Query(query, userID, startUtime, endUtime)
 	if err != nil {
 		return times, err
